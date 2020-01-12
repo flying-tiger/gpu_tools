@@ -4,18 +4,61 @@
 BUILD_PREFIX   := $(realpath .)
 INSTALL_PREFIX := /swbuild/tsa/apps/gpu_tools/1.0
 
-
+CMAKE_VERSION    := 3.16.2
 GCC_VERSION      := 7.5.0
 CLANG_VERSION    := 8.0.1
+CUDA_VERSION     := 9.2
+CUDA_BUILD       := 148_396.37
 EIGEN_VERSION    := 3.3.7
 PYBIND_VERSION   := 2.4.3
 CATCH_VERSION    := 2.11.1
 CPPDUALS_VERSION := 0.4.1
 KOKKOS_VERSION   := release-candidate-3.0
 
+CMAKE   := ${INSTALL_PREFIX}/bin/cmake
+CLANG   := ${INSTALL_PREFIX}/bin/clang
+CLANGXX := ${INSTALL_PREFIX}/bin/clang++
+GCC     := ${INSTALL_PREFIX}/bin/gcc
+GXX     := ${INSTALL_PREFIX}/bin/g++
+
 
 #-----------------------------------------------------------------------
-# GCC: Provides C++17 libstdc++
+# CMake: C++ Build System
+#-----------------------------------------------------------------------
+
+# Key Variables
+CMAKE_BUILD_DIR    := ${BUILD_PREFIX}/cmake-${CMAKE_VERSION}
+CMAKE_CONFIG_FILE  := ${CMAKE_BUILD_DIR}/config.done
+CMAKE_BUILD_FILE   := ${CMAKE_BUILD_DIR}/build.done
+CMAKE_INSTALL_FILE := ${CMAKE_BUILD_DIR}/install.done
+
+# Shortcut Targets
+.PHONY: cmake cmake-install cmake-build cmake-config cmake-clean
+cmake:         ${CMAKE_INSTALL_FILE}
+cmake-install: ${CMAKE_INSTALL_FILE}
+cmake-build:   ${CMAKE_BUILD_FILE}
+cmake-config:  ${CMAKE_CONFIG_FILE}
+cmake-clean:
+	rm -rf cmake-*
+
+# Recipies
+${CMAKE_INSTALL_FILE}: ${CMAKE_BUILD_FILE}
+	bash cmake-${CMAKE_VERSION}-Linux-x86_64.sh \
+	  --prefix=${INSTALL_PREFIX} \
+	  --skip-license && \
+	  touch ${CMAKE_INSTALL_FILE}
+
+${CMAKE_BUILD_FILE}: ${CMAKE_CONFIG_FILE}
+	touch ${CMAKE_BUILD_FILE}
+
+${CMAKE_CONFIG_FILE}:
+	wget -nc https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-x86_64.sh
+	mkdir -p ${CMAKE_BUILD_DIR}
+	touch ${CMAKE_CONFIG_FILE}
+
+
+#-----------------------------------------------------------------------
+# GCC: C++17 Standard Library
 #-----------------------------------------------------------------------
 
 # Key Variables
@@ -52,7 +95,7 @@ ${GCC_CONFIG_FILE}:
 
 
 #-----------------------------------------------------------------------
-# Clang: Provides C++17 compiler (GPU-capable)
+# Clang: GPU-Capable C++17 Compiler
 #-----------------------------------------------------------------------
 
 # Key Variables
@@ -77,16 +120,52 @@ ${CLANG_INSTALL_FILE}: ${CLANG_BUILD_FILE}
 ${CLANG_BUILD_FILE}: ${CLANG_CONFIG_FILE}
 	cd ${CLANG_BUILD_DIR} && make -j4 && touch ${CLANG_BUILD_FILE}
 
-${CLANG_CONFIG_FILE}: ${GCC_INSTALL_FILE}
+${CLANG_CONFIG_FILE}: ${GCC_INSTALL_FILE} #${CMAKE_INSTALL_FILE}
 	wget -nc https://github.com/llvm/llvm-project/archive/llvmorg-${CLANG_VERSION}.tar.gz
 	tar xf llvmorg-${CLANG_VERSION}.tar.gz
 	mkdir -p ${CLANG_BUILD_DIR}
-	cd ${CLANG_BUILD_DIR} && cmake ../llvm \
-	  -DCMAKE_CXX_COMPILER=${INSTALL_PREFIX}/bin/g++ \
-	  -DCMAKE_C_COMPILER=${INSTALL_PREFIX}/bin/gcc \
+	cd ${CLANG_BUILD_DIR} && ${CMAKE} ../llvm \
+	  -DCMAKE_CXX_COMPILER=${GXX} \
+	  -DCMAKE_C_COMPILER=${GCC} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release \
 	  -DLLVM_ENABLE_PROJECTS="clang;openmp"
+
+
+#-----------------------------------------------------------------------
+# CUDA: GPU Programming Toolkit
+#-----------------------------------------------------------------------
+
+# Key Variables
+CUDA_BUILD_DIR    := ${BUILD_PREFIX}/cuda-${CUDA_VERSION}
+CUDA_CONFIG_FILE  := ${CUDA_BUILD_DIR}/config.done
+CUDA_BUILD_FILE   := ${CUDA_BUILD_DIR}/build.done
+CUDA_INSTALL_FILE := ${CUDA_BUILD_DIR}/install.done
+
+# Shortcut Targets
+.PHONY: cuda cuda-install cuda-build cuda-config cuda-clean
+cuda:         ${CUDA_INSTALL_FILE}
+cuda-install: ${CUDA_INSTALL_FILE}
+cuda-build:   ${CUDA_BUILD_FILE}
+cuda-config:  ${CUDA_CONFIG_FILE}
+cuda-clean:
+	rm -rf cuda-*
+
+# Recipies
+${CUDA_INSTALL_FILE}: ${CUDA_BUILD_FILE}
+	bash cuda_${CUDA_VERSION}.${CUDA_BUILD}_linux \
+	  --silent \
+	  --toolkit \
+	  --toolkitpath=${INSTALL_PREFIX}/cuda-${CUDA_VERSION} && \
+	  touch ${CUDA_INSTALL_FILE}
+
+${CUDA_BUILD_FILE}: ${CUDA_CONFIG_FILE}
+	touch ${CUDA_BUILD_FILE}
+
+${CUDA_CONFIG_FILE}:
+	wget -nc https://developer.nvidia.com/compute/cuda/${CUDA_VERSION}/Prod2/local_installers/cuda_${CUDA_VERSION}.${CUDA_BUILD}_linux
+	mkdir -p ${CUDA_BUILD_DIR}
+	touch ${CUDA_CONFIG_FILE}
 
 
 #-----------------------------------------------------------------------
@@ -119,9 +198,9 @@ ${EIGEN_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	wget -nc https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz
 	tar xf eigen-${EIGEN_VERSION}.tar.gz
 	mkdir -p ${EIGEN_BUILD_DIR}
-	cd ${EIGEN_BUILD_DIR} && cmake .. \
-	  -DCMAKE_CXX_COMPILER=${INSTALL_PREFIX}/bin/clang++ \
-	  -DCMAKE_C_COMPILER=${INSTALL_PREFIX}/bin/clang \
+	cd ${EIGEN_BUILD_DIR} && ${CMAKE} .. \
+	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
+	  -DCMAKE_C_COMPILER=${CLANG} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release
@@ -153,12 +232,12 @@ ${PYBIND_INSTALL_FILE}: ${PYBIND_BUILD_FILE}
 ${PYBIND_BUILD_FILE}: ${PYBIND_CONFIG_FILE}
 	cd ${PYBIND_BUILD_DIR} && make -j4 && touch ${PYBIND_BUILD_FILE}
 
-${PYBIND_CONFIG_FILE}: ${EIGEN_INSTALL_FILE}
+${PYBIND_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	wget -nc https://github.com/pybind/pybind11/archive/v${PYBIND_VERSION}.tar.gz
 	tar xf v${PYBIND_VERSION}.tar.gz
 	mkdir -p ${PYBIND_BUILD_DIR}
-	cd ${PYBIND_BUILD_DIR} && cmake .. \
-	  -DCMAKE_CXX_COMPILER=${INSTALL_PREFIX}/bin/clang++ \
+	cd ${PYBIND_BUILD_DIR} && ${CMAKE} .. \
+	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release \
@@ -195,8 +274,8 @@ ${CATCH_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	wget -nc https://github.com/catchorg/Catch2/archive/v${CATCH_VERSION}.tar.gz
 	tar xf v${CATCH_VERSION}.tar.gz
 	mkdir -p ${CATCH_BUILD_DIR}
-	cd ${CATCH_BUILD_DIR} && cmake .. \
-	  -DCMAKE_CXX_COMPILER=${INSTALL_PREFIX}/bin/clang++ \
+	cd ${CATCH_BUILD_DIR} && ${CMAKE} .. \
+	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release \
@@ -234,8 +313,8 @@ ${CPPDUALS_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	tar xf cppduals-v${CPPDUALS_VERSION}.tar.gz
 	mkdir -p ${CPPDUALS_BUILD_DIR}
 	cd ${CPPDUALS_BUILD_DIR} && cmake .. \
-	  -DCMAKE_CXX_COMPILER=${INSTALL_PREFIX}/bin/clang++ \
-	  -DCMAKE_C_COMPILER=${INSTALL_PREFIX}/bin/clang \
+	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
+	  -DCMAKE_C_COMPILER=${CLANG} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release
@@ -247,7 +326,7 @@ ${CPPDUALS_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 
 # Key Variables
 KOKKOS_BUILD_DIR    := ${BUILD_PREFIX}/kokkos-${KOKKOS_VERSION}/build
-KOKKOS_CONFIG_FILE  := ${KOKKOS_BUILD_DIR}/CMakeCache.txt
+KOKKOS_CONFIG_FILE  := ${KOKKOS_BUILD_DIR}/config.done
 KOKKOS_BUILD_FILE   := ${KOKKOS_BUILD_DIR}/build.done
 KOKKOS_INSTALL_FILE := ${KOKKOS_BUILD_DIR}/install.done
 
@@ -267,13 +346,13 @@ ${KOKKOS_INSTALL_FILE}: ${KOKKOS_BUILD_FILE}
 ${KOKKOS_BUILD_FILE}: ${KOKKOS_CONFIG_FILE}
 	cd ${KOKKOS_BUILD_DIR} && make -j4 && touch ${KOKKOS_BUILD_FILE}
 
-${KOKKOS_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
-	wget -nc https://github.com/kokkos/kokkos/archive/${KOKKOS_VERSION}.tar.gz
+${KOKKOS_CONFIG_FILE}: ${CLANG_INSTALL_FILE} ${CUDA_INSTALL_FILE}
+	wget -nc https://github.com/flying-tiger/kokkos/archive/${KOKKOS_VERSION}.tar.gz
 	tar xf ${KOKKOS_VERSION}.tar.gz
 	mkdir -p ${KOKKOS_BUILD_DIR}
-	cd ${KOKKOS_BUILD_DIR} && cmake .. \
-	  -DCMAKE_CXX_COMPILER=${INSTALL_PREFIX}/bin/clang++ \
-	  -DCMAKE_C_COMPILER=${INSTALL_PREFIX}/bin/clang \
+	cd ${KOKKOS_BUILD_DIR} && ${CMAKE} .. \
+	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
+	  -DCMAKE_CXX_FLAGS="--cuda-path=${INSTALL_PREFIX}/cuda-${CUDA_VERSION}" \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release \
@@ -283,5 +362,7 @@ ${KOKKOS_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	  -DKokkos_ENABLE_OPENMP=ON  \
 	  -DKokkos_ENABLE_CUDA=ON    \
 	  -DKokkos_ENABLE_CUDA_LAMBDA=ON \
-	  -DKokkos_ENABLE_CUDA_CONSTEXPR=ON
+	  -DKokkos_ENABLE_CUDA_CONSTEXPR=ON \
+	  -DKokkos_CUDA_DIR=${INSTALL_PREFIX}/cuda-${CUDA_VERSION} && \
+	touch ${KOKKOS_CONFIG_FILE}
 
