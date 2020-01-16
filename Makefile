@@ -9,8 +9,8 @@ GCC_VERSION      := 7.5.0
 CLANG_VERSION    := 8.0.1
 CUDA_VERSION     := 9.2
 CUDA_BUILD       := 148_396.37
-EIGEN_VERSION    := 3.3.7
-PYBIND_VERSION   := 2.4.3
+EIGEN_VERSION    := master
+PYBIND_VERSION   := master
 CATCH_VERSION    := 2.11.1
 CPPDUALS_VERSION := 0.4.1
 KOKKOS_VERSION   := release-candidate-3.0
@@ -233,8 +233,8 @@ ${PYBIND_BUILD_FILE}: ${PYBIND_CONFIG_FILE}
 	cd ${PYBIND_BUILD_DIR} && make -j4 && touch ${PYBIND_BUILD_FILE}
 
 ${PYBIND_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
-	wget -nc https://github.com/pybind/pybind11/archive/v${PYBIND_VERSION}.tar.gz
-	tar xf v${PYBIND_VERSION}.tar.gz
+	wget -nc https://github.com/pybind/pybind11/archive/${PYBIND_VERSION}.tar.gz
+	tar xf ${PYBIND_VERSION}.tar.gz
 	mkdir -p ${PYBIND_BUILD_DIR}
 	cd ${PYBIND_BUILD_DIR} && ${CMAKE} .. \
 	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
