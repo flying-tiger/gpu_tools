@@ -1,0 +1,21 @@
+#%Module1.0
+module-whatis Adds GPU Development Tools v1.0 to the user's environment
+
+# Set installation root
+set  root  /swbuild/tsa/apps/gpu_tools/1.0
+
+# Configure environment variables
+setenv  GPU_TOOLS_ROOT     $root
+setenv  CUDA_ROOT          $root/cuda-9.2
+setenv  CXX                $root/bin/clang++
+setenv  CC                 $root/bin/clang
+setenv  FC                 $root/bin/gfortran
+setenv  CMAKE_PREFIX_PATH  $root
+
+# Configure search path
+prepend-path  PATH              $root/bin
+prepend-path  PATH              $root/cuda-9.2/bin
+prepend-path  LD_LIBRARY_PATH   $root/lib
+prepend-path  LD_LIBRART_PATH   $root/lib64
+
+

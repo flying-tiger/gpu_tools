@@ -2,7 +2,7 @@
 # Toolchain Configuration
 #-----------------------------------------------------------------------
 BUILD_PREFIX   := $(realpath .)
-INSTALL_PREFIX := /swbuild/tsa/apps/gpu_tools/1.0
+INSTALL_PREFIX := $(realpath .)/install
 
 CMAKE_VERSION    := 3.16.2
 GCC_VERSION      := 7.5.0
@@ -20,6 +20,36 @@ CLANG   := ${INSTALL_PREFIX}/bin/clang
 CLANGXX := ${INSTALL_PREFIX}/bin/clang++
 GCC     := ${INSTALL_PREFIX}/bin/gcc
 GXX     := ${INSTALL_PREFIX}/bin/g++
+
+
+#-----------------------------------------------------------------------
+# Alias Targets
+#-----------------------------------------------------------------------
+.PHONY: help
+help:
+	@echo "Useage:"
+	@echo "  make INSTALL_PREFIX=<prefix> [target]\n"
+	@echo "Targets:"
+	@echo "  all       Install all software"
+	@echo "  cmake     Install CMake ${CMAKE_VERSION}"
+	@echo "  gcc       Install GCC ${GCC_VERSION}"
+	@echo "  clang     Install Clang ${CLANG_VERSION}"
+	@echo "  cuda      Install Cuda ${CUDA_VERSION}"
+	@echo "  eigen     Install Eigen ${EIGEN_VERSION}"
+	@echo "  pybind    Install Pybind11 ${PYBIND_VERSION}"
+	@echo "  catch     Install Catch2 ${CATCH_VERSION}"
+	@echo "  cppduals  Install CppDuals ${CPPDUALS_VERSION}"
+	@echo "  kokkos    Install Kokkos ${KOKKOS_VERSION}"
+	@echo "  clean     Remove all download/build files\n"
+	@echo "Install Path:"
+	@echo "  ${INSTALL_PREFIX}\n"
+
+.PHONY: all
+all: kokkos cppduals catch pybind eigen cuda clang gcc cmake
+
+.PHONY: clean
+clean: kokkos-clean cppduals-clean catch-clean pybind-clean eigen-clean \
+       cuda-clean clang-clean gcc-clean cmake-clean
 
 
 #-----------------------------------------------------------------------
