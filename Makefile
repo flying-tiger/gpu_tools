@@ -10,10 +10,11 @@ CLANG_VERSION    := 8.0.1
 CUDA_VERSION     := 9.2
 CUDA_BUILD       := 148_396.37
 EIGEN_VERSION    := master
-PYBIND_VERSION   := master
+PYBIND_VERSION   := 2.5.0
 CATCH_VERSION    := 2.11.1
 CPPDUALS_VERSION := 0.4.1
-KOKKOS_VERSION   := release-candidate-3.0
+AUTODIFF_VERSION := 0.5.10
+KOKKOS_VERSION   := 3.1.00
 
 CMAKE   := ${INSTALL_PREFIX}/bin/cmake
 CLANG   := ${INSTALL_PREFIX}/bin/clang
@@ -21,6 +22,7 @@ CLANGXX := ${INSTALL_PREFIX}/bin/clang++
 GCC     := ${INSTALL_PREFIX}/bin/gcc
 GXX     := ${INSTALL_PREFIX}/bin/g++
 
+NJOBS   := 4
 
 #-----------------------------------------------------------------------
 # Alias Targets
@@ -39,17 +41,18 @@ help:
 	@echo "  pybind    Install Pybind11 ${PYBIND_VERSION}"
 	@echo "  catch     Install Catch2 ${CATCH_VERSION}"
 	@echo "  cppduals  Install CppDuals ${CPPDUALS_VERSION}"
+	@echo "  autodiff  Install AutoDiff ${AUTODIFF_VERSION}"
 	@echo "  kokkos    Install Kokkos ${KOKKOS_VERSION}"
 	@echo "  clean     Remove all download/build files\n"
 	@echo "Install Path:"
 	@echo "  ${INSTALL_PREFIX}\n"
 
 .PHONY: all
-all: kokkos cppduals catch pybind eigen cuda clang gcc cmake
+all: kokkos cppduals autodiff catch pybind eigen cuda clang gcc cmake
 
 .PHONY: clean
-clean: kokkos-clean cppduals-clean catch-clean pybind-clean eigen-clean \
-       cuda-clean clang-clean gcc-clean cmake-clean
+clean: kokkos-clean cppduals-clean autodiff-clean catch-clean pybind-clean \
+       eigen-clean cuda-clean clang-clean gcc-clean cmake-clean
 
 
 #-----------------------------------------------------------------------
@@ -73,6 +76,7 @@ cmake-clean:
 
 # Recipies
 ${CMAKE_INSTALL_FILE}: ${CMAKE_BUILD_FILE}
+	mkdir -p ${INSTALL_PREFIX}
 	bash cmake-${CMAKE_VERSION}-Linux-x86_64.sh \
 	  --prefix=${INSTALL_PREFIX} \
 	  --skip-license && \
@@ -108,10 +112,10 @@ gcc-clean:
 
 # Recipies
 ${GCC_INSTALL_FILE}: ${GCC_BUILD_FILE}
-	cd ${GCC_BUILD_DIR} && make -j4 install && touch ${GCC_INSTALL_FILE}
+	cd ${GCC_BUILD_DIR} && make -j${NJOBS} install && touch ${GCC_INSTALL_FILE}
 
 ${GCC_BUILD_FILE}: ${GCC_CONFIG_FILE}
-	cd ${GCC_BUILD_DIR} && make -j4 && touch ${GCC_BUILD_FILE}
+	cd ${GCC_BUILD_DIR} && make -j${NJOBS} && touch ${GCC_BUILD_FILE}
 
 ${GCC_CONFIG_FILE}:
 	wget -nc https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
@@ -133,6 +137,11 @@ CLANG_BUILD_DIR    := ${BUILD_PREFIX}/llvm-project-llvmorg-${CLANG_VERSION}/buil
 CLANG_CONFIG_FILE  := ${CLANG_BUILD_DIR}/CMakeCache.txt
 CLANG_BUILD_FILE   := ${CLANG_BUILD_DIR}/build.done
 CLANG_INSTALL_FILE := ${CLANG_BUILD_DIR}/install.done
+ifneq (,$(wildcard /usr/include/plugin-api.h))
+    CLANG_WITH_GOLD := -DLLVM_BINUTILS_INCDIR=/usr/include
+else
+    CLANG_WITH_GOLD :=
+endif
 
 # Shortcut Targets
 .PHONY: clang clang-install clang-build clang-config clang-clean
@@ -145,12 +154,12 @@ clang-clean:
 
 # Recipies
 ${CLANG_INSTALL_FILE}: ${CLANG_BUILD_FILE}
-	cd ${CLANG_BUILD_DIR} && make -j4 install && touch ${CLANG_INSTALL_FILE}
+	cd ${CLANG_BUILD_DIR} && make -j${NJOBS} install && touch ${CLANG_INSTALL_FILE}
 
 ${CLANG_BUILD_FILE}: ${CLANG_CONFIG_FILE}
-	cd ${CLANG_BUILD_DIR} && make -j4 && touch ${CLANG_BUILD_FILE}
+	cd ${CLANG_BUILD_DIR} && make -j${NJOBS} && touch ${CLANG_BUILD_FILE}
 
-${CLANG_CONFIG_FILE}: ${GCC_INSTALL_FILE} #${CMAKE_INSTALL_FILE}
+${CLANG_CONFIG_FILE}: ${GCC_INSTALL_FILE} ${CMAKE_INSTALL_FILE}
 	wget -nc https://github.com/llvm/llvm-project/archive/llvmorg-${CLANG_VERSION}.tar.gz
 	tar xf llvmorg-${CLANG_VERSION}.tar.gz
 	mkdir -p ${CLANG_BUILD_DIR}
@@ -159,7 +168,8 @@ ${CLANG_CONFIG_FILE}: ${GCC_INSTALL_FILE} #${CMAKE_INSTALL_FILE}
 	  -DCMAKE_C_COMPILER=${GCC} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
 	  -DCMAKE_BUILD_TYPE=Release \
-	  -DLLVM_ENABLE_PROJECTS="clang;openmp"
+	  -DLLVM_ENABLE_PROJECTS="clang;openmp" \
+	  ${CLANG_WITH_GOLD}
 
 
 #-----------------------------------------------------------------------
@@ -219,10 +229,10 @@ eigen-clean:
 
 # Recipies
 ${EIGEN_INSTALL_FILE}: ${EIGEN_BUILD_FILE}
-	cd ${EIGEN_BUILD_DIR} && make -j4 install && touch ${EIGEN_INSTALL_FILE}
+	cd ${EIGEN_BUILD_DIR} && make -j${NJOBS} install && touch ${EIGEN_INSTALL_FILE}
 
 ${EIGEN_BUILD_FILE}: ${EIGEN_CONFIG_FILE}
-	cd ${EIGEN_BUILD_DIR} && make -j4 && touch ${EIGEN_BUILD_FILE}
+	cd ${EIGEN_BUILD_DIR} && make -j${NJOBS} && touch ${EIGEN_BUILD_FILE}
 
 ${EIGEN_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	wget -nc https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz
@@ -257,14 +267,14 @@ pybind-clean:
 
 # Recipies
 ${PYBIND_INSTALL_FILE}: ${PYBIND_BUILD_FILE}
-	cd ${PYBIND_BUILD_DIR} && make -j4 install && touch ${PYBIND_INSTALL_FILE}
+	cd ${PYBIND_BUILD_DIR} && make -j${NJOBS} install && touch ${PYBIND_INSTALL_FILE}
 
 ${PYBIND_BUILD_FILE}: ${PYBIND_CONFIG_FILE}
-	cd ${PYBIND_BUILD_DIR} && make -j4 && touch ${PYBIND_BUILD_FILE}
+	cd ${PYBIND_BUILD_DIR} && make -j${NJOBS} && touch ${PYBIND_BUILD_FILE}
 
 ${PYBIND_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
-	wget -nc https://github.com/pybind/pybind11/archive/${PYBIND_VERSION}.tar.gz
-	tar xf ${PYBIND_VERSION}.tar.gz
+	wget -nc https://github.com/pybind/pybind11/archive/v${PYBIND_VERSION}.tar.gz
+	tar xf v${PYBIND_VERSION}.tar.gz
 	mkdir -p ${PYBIND_BUILD_DIR}
 	cd ${PYBIND_BUILD_DIR} && ${CMAKE} .. \
 	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
@@ -295,10 +305,10 @@ catch-clean:
 
 # Recipies
 ${CATCH_INSTALL_FILE}: ${CATCH_BUILD_FILE}
-	cd ${CATCH_BUILD_DIR} && make -j4 install && touch ${CATCH_INSTALL_FILE}
+	cd ${CATCH_BUILD_DIR} && make -j${NJOBS} install && touch ${CATCH_INSTALL_FILE}
 
 ${CATCH_BUILD_FILE}: ${CATCH_CONFIG_FILE}
-	cd ${CATCH_BUILD_DIR} && make -j4 && touch ${CATCH_BUILD_FILE}
+	cd ${CATCH_BUILD_DIR} && make -j${NJOBS} && touch ${CATCH_BUILD_FILE}
 
 ${CATCH_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	wget -nc https://github.com/catchorg/Catch2/archive/v${CATCH_VERSION}.tar.gz
@@ -333,16 +343,54 @@ cppduals-clean:
 
 # Recipies
 ${CPPDUALS_INSTALL_FILE}: ${CPPDUALS_BUILD_FILE}
-	cd ${CPPDUALS_BUILD_DIR} && make -j4 install && touch ${CPPDUALS_INSTALL_FILE}
+	cd ${CPPDUALS_BUILD_DIR} && make -j${NJOBS} install && touch ${CPPDUALS_INSTALL_FILE}
 
 ${CPPDUALS_BUILD_FILE}: ${CPPDUALS_CONFIG_FILE}
-	cd ${CPPDUALS_BUILD_DIR} && make -j4 && touch ${CPPDUALS_BUILD_FILE}
+	cd ${CPPDUALS_BUILD_DIR} && make -j${NJOBS} && touch ${CPPDUALS_BUILD_FILE}
 
 ${CPPDUALS_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	wget -nc https://gitlab.com/tesch1/cppduals/-/archive/v${CPPDUALS_VERSION}/cppduals-v${CPPDUALS_VERSION}.tar.gz
 	tar xf cppduals-v${CPPDUALS_VERSION}.tar.gz
 	mkdir -p ${CPPDUALS_BUILD_DIR}
 	cd ${CPPDUALS_BUILD_DIR} && cmake .. \
+	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
+	  -DCMAKE_C_COMPILER=${CLANG} \
+	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
+	  -DCMAKE_PREFIX_PATH=${INSTALL_PREFIX} \
+	  -DCMAKE_BUILD_TYPE=Release
+
+
+#-----------------------------------------------------------------------
+# Autodiff: (Another) C++ Automatic Differentiation Library
+#-----------------------------------------------------------------------
+
+# Key Variables
+AUTODIFF_BUILD_DIR    := ${BUILD_PREFIX}/autodiff-${AUTODIFF_VERSION}/build
+AUTODIFF_CONFIG_FILE  := ${AUTODIFF_BUILD_DIR}/CMakeCache.txt
+AUTODIFF_BUILD_FILE   := ${AUTODIFF_BUILD_DIR}/build.done
+AUTODIFF_INSTALL_FILE := ${AUTODIFF_BUILD_DIR}/install.done
+
+# Shortcut Targets
+.PHONY: autodiff autodiff-install autodiff-build autodiff-config autodiff-clean
+autodiff:         ${AUTODIFF_INSTALL_FILE}
+autodiff-install: ${AUTODIFF_INSTALL_FILE}
+autodiff-build:   ${AUTODIFF_BUILD_FILE}
+autodiff-config:  ${AUTODIFF_CONFIG_FILE}
+autodiff-clean:
+	rm -rf autodiff-*
+
+# Recipies
+${AUTODIFF_INSTALL_FILE}: ${AUTODIFF_BUILD_FILE}
+	cd ${AUTODIFF_BUILD_DIR} && make -j${NJOBS} install && touch ${AUTODIFF_INSTALL_FILE}
+
+${AUTODIFF_BUILD_FILE}: ${AUTODIFF_CONFIG_FILE}
+	cd ${AUTODIFF_BUILD_DIR} && make -j${NJOBS} && touch ${AUTODIFF_BUILD_FILE}
+
+${AUTODIFF_CONFIG_FILE}: # ${CLANG_INSTALL_FILE}
+	wget -nc https://github.com/autodiff/autodiff/archive/v${AUTODIFF_VERSION}.tar.gz
+	tar xf v${AUTODIFF_VERSION}.tar.gz
+	mkdir -p ${AUTODIFF_BUILD_DIR}
+	#cd ${AUTODIFF_BUILD_DIR} && cmake .. \
 	  -DCMAKE_CXX_COMPILER=${CLANGXX} \
 	  -DCMAKE_C_COMPILER=${CLANG} \
 	  -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
@@ -371,13 +419,13 @@ kokkos-clean:
 
 # Recipies
 ${KOKKOS_INSTALL_FILE}: ${KOKKOS_BUILD_FILE}
-	cd ${KOKKOS_BUILD_DIR} && make -j4 install && touch ${KOKKOS_INSTALL_FILE}
+	cd ${KOKKOS_BUILD_DIR} && make -j${NJOBS} install && touch ${KOKKOS_INSTALL_FILE}
 
 ${KOKKOS_BUILD_FILE}: ${KOKKOS_CONFIG_FILE}
-	cd ${KOKKOS_BUILD_DIR} && make -j4 && touch ${KOKKOS_BUILD_FILE}
+	cd ${KOKKOS_BUILD_DIR} && make -j${NJOBS} && touch ${KOKKOS_BUILD_FILE}
 
 ${KOKKOS_CONFIG_FILE}: ${CLANG_INSTALL_FILE} ${CUDA_INSTALL_FILE}
-	wget -nc https://github.com/flying-tiger/kokkos/archive/${KOKKOS_VERSION}.tar.gz
+	wget -nc https://github.com/kokkos/kokkos/archive/${KOKKOS_VERSION}.tar.gz
 	tar xf ${KOKKOS_VERSION}.tar.gz
 	mkdir -p ${KOKKOS_BUILD_DIR}
 	cd ${KOKKOS_BUILD_DIR} && ${CMAKE} .. \
