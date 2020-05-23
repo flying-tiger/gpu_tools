@@ -1,11 +1,2 @@
-gcc*
-llvm*
-Catch*
-cmake*
-cppduals*
-cuda*
-eigen*
-kokkos*
-pybind*
-*.tar.gz
-*.tar.xz
+build
+install
