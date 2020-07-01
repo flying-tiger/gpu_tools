@@ -1,8 +1,8 @@
 #%Module1.0
-module-whatis Adds GPU Development Tools v1.0 to the user's environment
+module-whatis Adds GPU Development Tools v1.1 to the user's environment
 
 # Set installation root
-set  root  /swbuild/tsa/apps/gpu_tools/1.0
+set  root  /swbuild/tsa/apps/gpu_tools/1.1
 
 # Configure environment variables
 setenv  GPU_TOOLS_ROOT     $root

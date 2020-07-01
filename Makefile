@@ -31,7 +31,8 @@ NJOBS   := 4
 .PHONY: help
 help:
 	@echo "Useage:"
-	@echo "  make INSTALL_PREFIX=<prefix> [target]\n"
+	@echo "  make INSTALL_PREFIX=<prefix> NJOBS=<num> [target]"
+	@echo
 	@echo "Targets:"
 	@echo "  all       Install all software"
 	@echo "  cmake     Install CMake ${CMAKE_VERSION}"
@@ -44,9 +45,12 @@ help:
 	@echo "  cppduals  Install CppDuals ${CPPDUALS_VERSION}"
 	@echo "  autodiff  Install AutoDiff ${AUTODIFF_VERSION}"
 	@echo "  kokkos    Install Kokkos ${KOKKOS_VERSION}"
-	@echo "  clean     Remove all download/build files\n"
-	@echo "Install Path:"
-	@echo "  ${INSTALL_PREFIX}\n"
+	@echo "  clean     Remove all download/build files"
+	@echo
+	@echo "Install Path:  ${INSTALL_PREFIX}"
+	@echo "Parallel Jobs: ${NJOBS}"
+	@echo
+
 
 .PHONY: all
 all: kokkos cppduals autodiff catch pybind eigen cuda clang gcc cmake
@@ -170,7 +174,7 @@ ${CLANG_BUILD_FILE}: ${CLANG_CONFIG_FILE}
 	cd ${CLANG_BUILD_DIR} && make -j${NJOBS}
 	touch ${CLANG_BUILD_FILE}
 
-${CLANG_CONFIG_FILE}: # ${GCC_INSTALL_FILE} ${CMAKE_INSTALL_FILE}
+${CLANG_CONFIG_FILE}: ${GCC_INSTALL_FILE} ${CMAKE_INSTALL_FILE}
 	mkdir -p ${CLANG_BASE_DIR} ${CLANG_BUILD_DIR}
 	wget -nc -O ${CLANG_BASE_DIR}/clang.tar.gz \
 	    https://github.com/llvm/llvm-project/archive/llvmorg-${CLANG_VERSION}.tar.gz \
@@ -391,7 +395,7 @@ ${CPPDUALS_CONFIG_FILE}: ${CLANG_INSTALL_FILE}
 	    https://gitlab.com/tesch1/cppduals/-/archive/v${CPPDUALS_VERSION}/cppduals-v${CPPDUALS_VERSION}.tar.gz \
 	    || true
 	cd ${CPPDUALS_BASE_DIR} && tar xf cppduals.tar.gz --strip-components 1
-	cd ${CPPDUALS_BUILD_DIR} && cmake .. \
+	cd ${CPPDUALS_BUILD_DIR} && ${CMAKE} .. \
 	    -DCMAKE_CXX_COMPILER=${CLANGXX} \
 	    -DCMAKE_C_COMPILER=${CLANG} \
 	    -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
@@ -429,13 +433,13 @@ ${AUTODIFF_BUILD_FILE}: ${AUTODIFF_CONFIG_FILE}
 	cd ${AUTODIFF_BUILD_DIR} && make -j${NJOBS}
 	touch ${AUTODIFF_BUILD_FILE}
 
-${AUTODIFF_CONFIG_FILE}: # ${CLANG_INSTALL_FILE}
+${AUTODIFF_CONFIG_FILE}: ${CLANG_INSTALL_FILE} ${EIGEN_INSTALL_FILE}
 	mkdir -p ${AUTODIFF_BASE_DIR} ${AUTODIFF_BUILD_DIR}
 	wget -nc -O ${AUTODIFF_BASE_DIR}/autodiff.tar.gz \
 	    https://github.com/autodiff/autodiff/archive/v${AUTODIFF_VERSION}.tar.gz \
 	    || true
 	cd ${AUTODIFF_BASE_DIR} && tar xf autodiff.tar.gz --strip-components 1
-	cd ${AUTODIFF_BUILD_DIR} && cmake .. \
+	cd ${AUTODIFF_BUILD_DIR} && ${CMAKE} .. \
 	    -DCMAKE_CXX_COMPILER=${CLANGXX} \
 	    -DCMAKE_C_COMPILER=${CLANG} \
 	    -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
